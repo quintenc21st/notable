@@ -14,6 +14,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.shipbook.shipbooksdk.ShipBook
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,8 +47,15 @@ class PagesViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PagesUiState())
     val uiState: StateFlow<PagesUiState> = _uiState.asStateFlow()
 
+    private var loadJob: Job? = null
+    private var loadedBookId: String? = null
+
+    /** Starts observing [bookId]. Idempotent: calling it again for the same book is a no-op. */
     fun loadBook(bookId: String) {
-        viewModelScope.launch {
+        if (loadedBookId == bookId && loadJob?.isActive == true) return
+        loadJob?.cancel()
+        loadedBookId = bookId
+        loadJob = viewModelScope.launch {
             appRepository.bookRepository.getByIdLive(bookId).asFlow().collect { book ->
                 if (book == null) {
                     // Room re-emits on every write to the table; a null here means the row is gone.

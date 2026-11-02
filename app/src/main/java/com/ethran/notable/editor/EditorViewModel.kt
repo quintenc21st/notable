@@ -86,6 +86,8 @@ data class ToolbarUiState(
     val isMenuOpen: Boolean = false,
     val isStrokeSelectionOpen: Boolean = false,
     val isBackgroundSelectorModalOpen: Boolean = false,
+    /** Compact page picker opened from the page number in the toolbar. */
+    val isPagesPopupOpen: Boolean = false,
     val showResetView: Boolean = false,
 
     // Canvas / drawing
@@ -112,7 +114,8 @@ data class ToolbarUiState(
 
     val isDrawingAllowed: Boolean
         get() = !isSelectionActive &&
-                !(isMenuOpen || isStrokeSelectionOpen || isBackgroundSelectorModalOpen)
+                !(isMenuOpen || isStrokeSelectionOpen || isBackgroundSelectorModalOpen ||
+                        isPagesPopupOpen)
                 && !isQuickNavOpen
 }
 
@@ -148,6 +151,7 @@ sealed class ToolbarAction {
     object NavigateToLibrary : ToolbarAction()
     object NavigateToBugReport : ToolbarAction()
     object NavigateToPages : ToolbarAction()
+    data class TogglePagesPopup(val isOpen: Boolean) : ToolbarAction()
     object NavigateToHome : ToolbarAction()
 
     object CloseAllMenus : ToolbarAction()
@@ -385,7 +389,20 @@ class EditorViewModel @Inject constructor(
 
             ToolbarAction.NavigateToLibrary -> handleNavigateToLibrary()
             ToolbarAction.NavigateToBugReport -> sendUiEvent(EditorUiEvent.NavigateToBugReport)
-            ToolbarAction.NavigateToPages -> handleNavigateToPages()
+            ToolbarAction.NavigateToPages -> {
+                _toolbarState.update { it.copy(isPagesPopupOpen = false) }
+                handleNavigateToPages()
+            }
+
+            is ToolbarAction.TogglePagesPopup -> {
+                // Loose pages (no notebook) have nothing to pick from.
+                val open = action.isOpen && bookId != null
+                if (_toolbarState.value.isPagesPopupOpen != open) {
+                    _toolbarState.update { it.copy(isPagesPopupOpen = open) }
+                    updateDrawingState()
+                }
+            }
+
             ToolbarAction.NavigateToHome -> sendUiEvent(EditorUiEvent.NavigateToLibrary(null))
 
             ToolbarAction.CloseAllMenus -> handleCloseAllMenus()
@@ -453,10 +470,33 @@ class EditorViewModel @Inject constructor(
             it.copy(
                 isMenuOpen = false,
                 isStrokeSelectionOpen = false,
-                isBackgroundSelectorModalOpen = false
+                isBackgroundSelectorModalOpen = false,
+                isPagesPopupOpen = false
             )
         }
         updateDrawingState()
+    }
+
+    /**
+     * Re-derives the toolbar's "n/total" from [pageIds] (the notebook's current page order).
+     * Called by the pages popup after pages are added, deleted or moved.
+     */
+    fun syncPageNumber(pageIds: List<String>) {
+        if (bookId == null) return
+        val index = pageIds.indexOf(currentPageId)
+        if (index < 0) return
+        _toolbarState.update {
+            it.copy(
+                pageNumberInfo = "${index + 1}/${pageIds.size}",
+                currentPageNumber = index
+            )
+        }
+    }
+
+    /** Switches to [pageId] from the pages popup and closes it. */
+    fun switchPageFromPopup(pageId: String) {
+        if (pageId != currentPageId) changePage(pageId)
+        onToolbarAction(ToolbarAction.TogglePagesPopup(false))
     }
 
     private fun updateScribbleToErase(enabled: Boolean) {

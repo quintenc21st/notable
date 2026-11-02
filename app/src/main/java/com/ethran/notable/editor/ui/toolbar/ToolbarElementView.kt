@@ -121,7 +121,7 @@ fun ToolbarElementView(
                     Text(
                         text = uiState.pageNumberInfo,
                         fontWeight = FontWeight.Light,
-                        modifier = Modifier.noRippleClickable { onAction(ToolbarAction.NavigateToPages) },
+                        modifier = Modifier.noRippleClickable { onAction(ToolbarAction.TogglePagesPopup(!uiState.isPagesPopupOpen)) },
                         textAlign = TextAlign.Center
                     )
                 }

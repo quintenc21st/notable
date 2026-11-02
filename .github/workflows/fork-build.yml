@@ -1,0 +1,66 @@
+name: Build fork APK
+
+# Builds an installable APK for this fork without the upstream maintainer's secrets.
+# Every successful build replaces the "fork-latest" release, so the newest APK is always at:
+#   https://github.com/<owner>/notable/releases/tag/fork-latest
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "app/**"
+      - "gradle/**"
+      - "*.gradle"
+      - ".github/workflows/fork-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fork-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: github.repository != 'Ethran/notable'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Build debug APK
+        env:
+          # Fixed key committed to this fork, so each new build installs as an update
+          # over the previous one. Path is relative to the app module.
+          STORE_FILE: ../keystore/fork-debug.keystore
+          STORE_PASSWORD: notable-fork
+          KEY_ALIAS: notablefork
+          KEY_PASSWORD: notable-fork
+        run: ./gradlew -PIS_NEXT=true assembleDebug
+
+      - name: Rename APK
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/debug/app-debug.apk "out/notable-fork-${GITHUB_SHA::7}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notable-fork-apk
+          path: out/*.apk
+
+      - name: Publish as "fork-latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete fork-latest --yes --cleanup-tag || true
+          gh release create fork-latest out/*.apk \
+            --title "Fork build ${GITHUB_SHA::7}" \
+            --notes "Built from \`${GITHUB_SHA}\` on $(date -u +'%Y-%m-%d %H:%M UTC'). Download the .apk below on your Boox to install." \
+            --prerelease

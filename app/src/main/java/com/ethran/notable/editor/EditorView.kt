@@ -20,6 +20,7 @@ import com.ethran.notable.editor.canvas.CanvasEventBus
 import com.ethran.notable.editor.state.ClipboardStore
 import com.ethran.notable.editor.ui.EditorSurface
 import com.ethran.notable.editor.ui.HorizontalScrollIndicator
+import com.ethran.notable.editor.ui.PagesPopup
 import com.ethran.notable.editor.ui.ScrollIndicator
 import com.ethran.notable.editor.ui.SelectedBitmap
 import com.ethran.notable.editor.ui.toolbar.PositionedToolbar
@@ -259,6 +260,20 @@ fun EditorView(
             PositionedToolbar(
                 viewModel = viewModel, onDrawingStateCheck = { viewModel.updateDrawingState() })
             HorizontalScrollIndicator(viewModel = viewModel, page = page)
+
+            val popupBookId = toolbarState.notebookId
+            if (toolbarState.isPagesPopupOpen && popupBookId != null) {
+                PagesPopup(
+                    bookId = popupBookId,
+                    currentPageId = toolbarState.pageId,
+                    onSwitchToPage = viewModel::switchPageFromPopup,
+                    onPagesChanged = viewModel::syncPageNumber,
+                    onOpenAllPages = { viewModel.onToolbarAction(ToolbarAction.NavigateToPages) },
+                    onDismiss = {
+                        viewModel.onToolbarAction(ToolbarAction.TogglePagesPopup(false))
+                    }
+                )
+            }
         }
     }
 }

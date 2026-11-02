@@ -15,6 +15,8 @@ env:
 
 jobs:
   build:
+    # Needs the upstream maintainer's secrets; forks use fork-build.yml instead.
+    if: github.repository == 'Ethran/notable'
     runs-on: ubuntu-latest
 
     steps:
