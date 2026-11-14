@@ -17,12 +17,16 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,7 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
@@ -51,6 +55,17 @@ import com.ethran.notable.editor.utils.autoEInkAnimationOnScroll
 import com.ethran.notable.ui.components.PagePreview
 import com.ethran.notable.ui.components.ScaledPopup
 import com.ethran.notable.ui.viewmodels.PagesViewModel
+import compose.icons.FeatherIcons
+import compose.icons.feathericons.ArrowLeft
+import compose.icons.feathericons.ArrowRight
+import compose.icons.feathericons.Check
+import compose.icons.feathericons.Copy
+import compose.icons.feathericons.Crosshair
+import compose.icons.feathericons.Grid
+import compose.icons.feathericons.Image
+import compose.icons.feathericons.PlusCircle
+import compose.icons.feathericons.Trash
+import compose.icons.feathericons.X
 import kotlinx.coroutines.launch
 
 /**
@@ -90,7 +105,7 @@ fun PagesPopup(
 
     val toolbarAtTop = GlobalAppSettings.current.toolbarPosition == AppSettings.Position.Top
     val density = LocalDensity.current
-    val gap = with(density) { (BUTTON_SIZE + 6).dp.roundToPx() }
+    val gap = with(density) { (BUTTON_SIZE + 10).dp.roundToPx() }
 
     ScaledPopup(
         alignment = if (toolbarAtTop) Alignment.TopCenter else Alignment.BottomCenter,
@@ -104,6 +119,7 @@ fun PagesPopup(
             currentPageId = currentPageId,
             onSwitchToPage = onSwitchToPage,
             onOpenAllPages = onOpenAllPages,
+            onClose = onDismiss,
             onDelete = viewModel::deletePage,
             onDuplicate = viewModel::duplicatePage,
             onAddAfter = { index -> viewModel.newPageInBook(bookId, index + 1) },
@@ -113,7 +129,14 @@ fun PagesPopup(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+// Sized for a 10.3" Boox in landscape (about 1300dp wide): roughly seven pages are visible
+// at once, and every long-press action fits on one row without scrolling.
+private val THUMB_WIDTH = 150.dp
+private val THUMB_SPACING = 14.dp
+private val PANEL_SHAPE = RoundedCornerShape(14.dp)
+private val THUMB_SHAPE = RoundedCornerShape(8.dp)
+private val BUTTON_SHAPE = RoundedCornerShape(10.dp)
+
 @Composable
 private fun PagesPopupContent(
     isLoading: Boolean,
@@ -121,6 +144,7 @@ private fun PagesPopupContent(
     currentPageId: String?,
     onSwitchToPage: (String) -> Unit,
     onOpenAllPages: () -> Unit,
+    onClose: () -> Unit,
     onDelete: (String) -> Unit,
     onDuplicate: (String) -> Unit,
     onAddAfter: (Int) -> Unit,
@@ -129,18 +153,24 @@ private fun PagesPopupContent(
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
 
-    // Page chosen with a long-press; while set, the action row is shown for it.
+    // Page chosen with a long-press; while set, the header turns into its action bar.
     var selectedPageId by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
     var previewsRequested by remember { mutableStateOf(false) }
 
     val currentIndex = pageIds.indexOf(currentPageId)
+    val thumbWidthPx = with(density) { THUMB_WIDTH.roundToPx() }
 
-    fun jumpToCurrent() {
-        if (currentIndex >= 0) {
-            // Leave a page or two of context to the left of the current one.
-            scope.launch { listState.scrollToItem((currentIndex - 2).coerceAtLeast(0)) }
+    /** Scrolls so that page [index] sits in the middle of the strip. */
+    suspend fun centerOn(index: Int) {
+        val viewport = listState.layoutInfo.viewportSize.width
+        if (viewport > 0) {
+            listState.scrollToItem(index, -((viewport - thumbWidthPx) / 2).coerceAtLeast(0))
+        } else {
+            // Not laid out yet: leave a few pages of context before it instead.
+            listState.scrollToItem((index - 3).coerceAtLeast(0))
         }
     }
 
@@ -148,7 +178,7 @@ private fun PagesPopupContent(
     var didInitialScroll by remember { mutableStateOf(false) }
     LaunchedEffect(isLoading, currentIndex) {
         if (!isLoading && !didInitialScroll && currentIndex >= 0) {
-            listState.scrollToItem((currentIndex - 2).coerceAtLeast(0))
+            centerOn(currentIndex)
             didInitialScroll = true
         }
     }
@@ -162,93 +192,132 @@ private fun PagesPopupContent(
         }
     }
 
+    val selectedId = selectedPageId
+    val selectedIndex = selectedId?.let { pageIds.indexOf(it) } ?: -1
+    val isSelecting = selectedId != null && selectedIndex >= 0
+
     Column(
         Modifier
-            .padding(horizontal = 12.dp)
+            .padding(horizontal = 24.dp)
+            .widthIn(max = 1180.dp)
             .fillMaxWidth()
-            .border(1.dp, Color.Black, RectangleShape)
+            .clip(PANEL_SHAPE)
             .background(Color.White)
-            .padding(vertical = 8.dp)
+            .border(2.dp, Color.Black, PANEL_SHAPE)
     ) {
-        // --- Header ---
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = if (pageIds.isEmpty()) "Pages"
-                else "Pages  ·  ${if (currentIndex >= 0) currentIndex + 1 else "–"} of ${pageIds.size}",
-                fontWeight = FontWeight.Bold,
-                color = Color.Black,
-            )
-            Spacer(Modifier.weight(1f))
-            Pill("Jump to current", filled = true, enabled = currentIndex >= 0) { jumpToCurrent() }
-            Spacer(Modifier.width(8.dp))
-            Pill("All pages") { onOpenAllPages() }
-        }
-
-        // --- Long-press actions for the selected page ---
-        val selectedId = selectedPageId
-        val selectedIndex = selectedId?.let { pageIds.indexOf(it) } ?: -1
-        if (selectedId != null && selectedIndex >= 0) {
-            Spacer(Modifier.height(8.dp))
+        // --- Header / action bar ---
+        if (isSelecting && selectedId != null) {
+            // Scrolls sideways as a fallback, should the actions not fit (portrait, large UI scale).
             Row(
                 Modifier
                     .fillMaxWidth()
+                    .background(Color.Black)
+                    .height(60.dp)
                     .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Page ${selectedIndex + 1}:", color = Color.Black)
+                Text(
+                    text = if (confirmDelete) "Delete page ${selectedIndex + 1}?"
+                    else "Page ${selectedIndex + 1}",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.padding(end = 12.dp)
+                )
                 if (confirmDelete) {
-                    Text("Delete this page?", color = Color.Black)
-                    Pill("Delete", filled = true) {
+                    BarButton(FeatherIcons.Trash, "Delete", onDark = true) {
                         onDelete(selectedId)
                         selectedPageId = null
                         confirmDelete = false
                     }
-                    Pill("Cancel") { confirmDelete = false }
+                    BarButton(FeatherIcons.X, "Cancel", onDark = true) { confirmDelete = false }
                 } else {
                     val isOpenPage = selectedId == currentPageId
+                    BarButton(
+                        FeatherIcons.ArrowLeft, "Move left", onDark = true,
+                        enabled = selectedIndex > 0
+                    ) { onMove(selectedId, selectedIndex - 1) }
+                    BarButton(
+                        FeatherIcons.ArrowRight, "Move right", onDark = true,
+                        enabled = selectedIndex < pageIds.size - 1
+                    ) { onMove(selectedId, selectedIndex + 1) }
+                    BarButton(FeatherIcons.PlusCircle, "Add after", onDark = true) {
+                        onAddAfter(selectedIndex)
+                    }
+                    BarButton(FeatherIcons.Copy, "Duplicate", onDark = true) {
+                        onDuplicate(selectedId)
+                    }
                     // The page shown in the editor can't be deleted out from under it.
-                    Pill(
-                        if (isOpenPage) "Delete (open page)" else "Delete",
-                        enabled = !isOpenPage
+                    BarButton(
+                        FeatherIcons.Trash, if (isOpenPage) "Delete (open)" else "Delete",
+                        onDark = true, enabled = !isOpenPage
                     ) { confirmDelete = true }
-                    Pill("Duplicate") { onDuplicate(selectedId) }
-                    Pill("Add page after") { onAddAfter(selectedIndex) }
-                    Pill("◀ Move", enabled = selectedIndex > 0) {
-                        onMove(selectedId, selectedIndex - 1)
-                    }
-                    Pill("Move ▶", enabled = selectedIndex < pageIds.size - 1) {
-                        onMove(selectedId, selectedIndex + 1)
-                    }
-                    Pill(if (previewsRequested) "Generating previews…" else "Generate previews") {
+                    BarButton(
+                        FeatherIcons.Image,
+                        if (previewsRequested) "Generating…" else "Previews",
+                        onDark = true
+                    ) {
                         onGeneratePreviews()
                         previewsRequested = true
                     }
-                    Pill("Done", filled = true) { selectedPageId = null }
+                    Spacer(Modifier.width(12.dp))
+                    BarButton(FeatherIcons.Check, "Done", onDark = true, emphasized = true) {
+                        selectedPageId = null
+                    }
                 }
+            }
+        } else {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Pages",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                )
+                if (pageIds.isNotEmpty()) {
+                    Text(
+                        text = (if (currentIndex >= 0) "${currentIndex + 1} of ${pageIds.size}"
+                        else "${pageIds.size}") + "  ·  hold a page for options",
+                        fontSize = 14.sp,
+                        color = Color.DarkGray,
+                        maxLines = 1,
+                        modifier = Modifier.padding(start = 6.dp)
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                BarButton(
+                    FeatherIcons.Crosshair, "Current page", emphasized = true,
+                    enabled = currentIndex >= 0
+                ) { scope.launch { centerOn(currentIndex) } }
+                BarButton(FeatherIcons.Grid, "All pages") { onOpenAllPages() }
+                BarButton(FeatherIcons.X, "Close") { onClose() }
             }
         }
 
-        Spacer(Modifier.height(8.dp))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(Color.Black)
+        )
 
         // --- Thumbnails ---
         if (isLoading) {
-            Text(
-                "Loading…",
-                color = Color.Black,
-                modifier = Modifier.padding(12.dp)
-            )
+            Text("Loading…", color = Color.Black, modifier = Modifier.padding(20.dp))
         } else {
             LazyRow(
                 state = listState,
-                contentPadding = PaddingValues(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(THUMB_SPACING),
                 modifier = Modifier
                     .fillMaxWidth()
                     .autoEInkAnimationOnScroll()
@@ -289,9 +358,10 @@ private fun PopupPageThumb(
     onTap: () -> Unit,
     onLongPress: () -> Unit,
 ) {
+    val borderWidth = if (isSelected || isCurrent) 3.dp else 1.dp
     Column(
         Modifier
-            .width(110.dp)
+            .width(THUMB_WIDTH)
             .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -304,65 +374,94 @@ private fun PopupPageThumb(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(3f / 4f)
-                .border(
-                    width = when {
-                        isSelected -> 4.dp
-                        isCurrent -> 2.dp
-                        else -> 1.dp
-                    },
-                    color = Color.Black,
-                    shape = RectangleShape
-                )
+                .clip(THUMB_SHAPE)
+                .background(Color.White)
+                .border(borderWidth, Color.Black, THUMB_SHAPE)
         ) {
             PagePreview(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(3f / 4f)
-                    .padding(if (isSelected) 4.dp else if (isCurrent) 2.dp else 1.dp),
+                    .padding(borderWidth),
                 pageId = pageId
             )
+            if (isSelected) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.Check,
+                        contentDescription = "Selected",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(6.dp))
         Text(
-            text = if (isCurrent) "${index + 1} · current" else "${index + 1}",
-            fontSize = 13.sp,
+            text = if (isCurrent) "${index + 1}  ·  Current" else "${index + 1}",
+            fontSize = 14.sp,
             fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
             color = if (isCurrent) Color.White else Color.Black,
             modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
+                .clip(CircleShape)
                 .background(if (isCurrent) Color.Black else Color.White)
-                .padding(horizontal = 6.dp, vertical = 2.dp)
+                .padding(horizontal = 10.dp, vertical = 3.dp)
         )
     }
 }
 
-/** E-ink friendly pill button: black outline, optionally filled black. */
+/**
+ * Icon + label button for the popup's header. Flat and high-contrast for e-ink: no shadows,
+ * ripples or greys that would ghost. [onDark] is for the black selection bar; [emphasized]
+ * fills the button with the bar's contrasting color.
+ */
 @Composable
-private fun Pill(
-    text: String,
-    filled: Boolean = false,
+private fun BarButton(
+    icon: ImageVector,
+    label: String,
+    onDark: Boolean = false,
+    emphasized: Boolean = false,
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(16.dp)
-    val textColor = when {
+    val fg = if (onDark) Color.White else Color.Black
+    val bg = if (onDark) Color.Black else Color.White
+    val filled = emphasized && enabled
+    val content = when {
         !enabled -> Color.Gray
-        filled -> Color.White
-        else -> Color.Black
+        filled -> bg
+        else -> fg
     }
-    Box(
+    Row(
         modifier = Modifier
-            .clip(shape)
-            .background(if (filled && enabled) Color.Black else Color.White)
-            .border(1.dp, if (enabled) Color.Black else Color.Gray, shape)
+            .height(40.dp)
+            .clip(BUTTON_SHAPE)
+            .background(if (filled) fg else bg)
+            .border(1.dp, if (enabled) fg else Color.Gray, BUTTON_SHAPE)
             .clickable(
                 enabled = enabled,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
             )
-            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text, color = textColor)
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = content,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(label, color = content, fontSize = 15.sp, maxLines = 1)
     }
 }
