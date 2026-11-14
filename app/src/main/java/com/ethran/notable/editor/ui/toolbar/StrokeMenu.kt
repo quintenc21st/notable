@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +40,8 @@ import com.ethran.notable.data.datastore.BUTTON_SIZE
 import com.ethran.notable.data.datastore.GlobalAppSettings
 import com.ethran.notable.editor.utils.PenSetting
 import com.ethran.notable.ui.components.ScaledPopup
+import com.ethran.notable.ui.theme.NotableStyle
+import com.ethran.notable.ui.theme.notablePanel
 import kotlin.math.roundToInt
 
 
@@ -53,9 +56,7 @@ fun StrokeMenu(
     val density = LocalDensity.current
 
     val columnModifier =
-        if (GlobalAppSettings.current.continuousStrokeSlider) Modifier
-            .background(Color.White)
-            .border(1.dp, Color.Black)
+        if (GlobalAppSettings.current.continuousStrokeSlider) Modifier.notablePanel()
         else Modifier
     ScaledPopup(
         offset = with(density) { IntOffset(0, 43.dp.roundToPx()) },
@@ -65,10 +66,12 @@ fun StrokeMenu(
     ) {
 
         Column(
-            modifier = columnModifier
+            modifier = Modifier
+                // Clear space below the panel, for when the toolbar is at the bottom.
+                .padding(bottom = (BUTTON_SIZE + 5).dp)
+                .then(columnModifier)
                 .width(IntrinsicSize.Min) // match the widest child (ColorPicker Row)
                 .padding(horizontal = 10.dp, vertical = 8.dp)
-                .padding(bottom = (BUTTON_SIZE + 5).dp) // For toolbar is located at the button,
         ) {
 
             val widthOfPicker = (35 * colorOptions.size.coerceAtLeast(5))
@@ -172,20 +175,19 @@ private fun ColorPicker(
         modifier.height(IntrinsicSize.Max)
     } else {
         modifier
-            .background(Color.White)
-            .border(1.dp, Color.Black)
+            .notablePanel(NotableStyle.ControlShape)
             .height(IntrinsicSize.Max)
+            .padding(3.dp)
     }
 
     Row(rowModifier) {
         colorOptions.map { color ->
+            val isChosen = color == Color(value.color)
+            // Round swatch; the chosen one gets an accent ring around it, which stays
+            // visible on every ink color (a black ring vanished on the black swatch).
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .background(color)
-                    .border(
-                        3.dp, if (color == Color(value.color)) Color.Black else Color.Transparent
-                    )
                     .clickable {
                         onChange(
                             PenSetting(
@@ -198,7 +200,13 @@ private fun ColorPicker(
                             )
                         )
                     }
-                    .padding(8.dp))
+                    .then(
+                        if (isChosen) Modifier.border(3.dp, NotableStyle.Accent, CircleShape)
+                        else Modifier
+                    )
+                    .padding(6.dp)
+                    .background(color, CircleShape)
+                    .border(1.dp, Color.Black, CircleShape))
         }
     }
 
@@ -219,9 +227,7 @@ private fun ThicknessPicker(
 ) {
 
     Row(
-        modifier = modifier
-            .background(Color.White)
-            .border(1.dp, Color.Black),
+        modifier = modifier.notablePanel(NotableStyle.ControlShape),
         horizontalArrangement = Arrangement.Center
     ) {
         sizeOptions.forEach {

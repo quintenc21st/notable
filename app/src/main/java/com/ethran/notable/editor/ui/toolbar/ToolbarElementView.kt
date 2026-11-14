@@ -52,6 +52,8 @@ import com.ethran.notable.editor.utils.Eraser
 import com.ethran.notable.ui.components.OnOffSwitch
 import com.ethran.notable.ui.components.ScaledPopup
 import com.ethran.notable.ui.noRippleClickable
+import com.ethran.notable.ui.theme.NotableStyle
+import com.ethran.notable.ui.theme.notablePanel
 
 /**
  * The single generic renderer for toolbar elements: draws the button (via [ToolbarButton]),
@@ -111,20 +113,39 @@ fun ToolbarElementView(
                     onSelect = onPickImage,
                 )
 
-            CustomKind.PAGE_NAV ->
+            CustomKind.PAGE_NAV -> {
+                // A pill, so it reads as a button; filled with the accent while the
+                // pages popup it opens is showing.
+                val open = uiState.isPagesPopupOpen
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .height(35.dp)
+                        .height(BUTTON_SIZE.dp)
+                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                        .noRippleClickable {
+                            onAction(ToolbarAction.TogglePagesPopup(!open))
+                        }
+                        .background(
+                            if (open) NotableStyle.Accent else Color.White,
+                            NotableStyle.ControlShape
+                        )
+                        .border(
+                            1.dp,
+                            if (open) NotableStyle.Accent else Color.Black,
+                            NotableStyle.ControlShape
+                        )
                         .padding(horizontal = 10.dp)
                 ) {
                     Text(
                         text = uiState.pageNumberInfo,
-                        fontWeight = FontWeight.Light,
-                        modifier = Modifier.noRippleClickable { onAction(ToolbarAction.TogglePagesPopup(!uiState.isPagesPopupOpen)) },
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 15.sp,
+                        color = if (open) NotableStyle.OnAccent else Color.Black,
+                        maxLines = 1,
                         textAlign = TextAlign.Center
                     )
                 }
+            }
 
             CustomKind.MENU ->
                 Column {
@@ -250,15 +271,14 @@ private fun EraserSubmenu(
             modifier = Modifier
                 .width(IntrinsicSize.Max)
                 .padding(bottom = (BUTTON_SIZE + 5).dp)
-                .background(Color.White)
-                .border(1.dp, Color.Black)
+                .notablePanel()
                 .height(IntrinsicSize.Max)
         ) {
             // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
@@ -273,7 +293,7 @@ private fun EraserSubmenu(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(IntrinsicSize.Max)
-                    .border(1.dp, Color.Black),
+                    .padding(horizontal = 8.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 spec.erasers.forEach { eraser ->
@@ -290,8 +310,7 @@ private fun EraserSubmenu(
 
             Row(
                 modifier = Modifier
-                    .padding(4.dp)
-                    .background(Color.White),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 BasicText(

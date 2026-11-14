@@ -54,6 +54,7 @@ import com.ethran.notable.data.datastore.GlobalAppSettings
 import com.ethran.notable.editor.utils.autoEInkAnimationOnScroll
 import com.ethran.notable.ui.components.PagePreview
 import com.ethran.notable.ui.components.ScaledPopup
+import com.ethran.notable.ui.theme.NotableStyle
 import com.ethran.notable.ui.viewmodels.PagesViewModel
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ArrowLeft
@@ -133,9 +134,9 @@ fun PagesPopup(
 // at once, and every long-press action fits on one row without scrolling.
 private val THUMB_WIDTH = 150.dp
 private val THUMB_SPACING = 14.dp
-private val PANEL_SHAPE = RoundedCornerShape(14.dp)
-private val THUMB_SHAPE = RoundedCornerShape(8.dp)
-private val BUTTON_SHAPE = RoundedCornerShape(10.dp)
+private val PANEL_SHAPE = NotableStyle.PanelShape
+private val THUMB_SHAPE = NotableStyle.SmallShape
+private val BUTTON_SHAPE = NotableStyle.ControlShape
 
 @Composable
 private fun PagesPopupContent(
@@ -376,7 +377,11 @@ private fun PopupPageThumb(
                 .aspectRatio(3f / 4f)
                 .clip(THUMB_SHAPE)
                 .background(Color.White)
-                .border(borderWidth, Color.Black, THUMB_SHAPE)
+                .border(
+                    borderWidth,
+                    if (isCurrent && !isSelected) NotableStyle.Accent else Color.Black,
+                    THUMB_SHAPE
+                )
         ) {
             PagePreview(
                 modifier = Modifier
@@ -412,7 +417,7 @@ private fun PopupPageThumb(
             color = if (isCurrent) Color.White else Color.Black,
             modifier = Modifier
                 .clip(CircleShape)
-                .background(if (isCurrent) Color.Black else Color.White)
+                .background(if (isCurrent) NotableStyle.Accent else Color.White)
                 .padding(horizontal = 10.dp, vertical = 3.dp)
         )
     }
@@ -435,17 +440,19 @@ private fun BarButton(
     val fg = if (onDark) Color.White else Color.Black
     val bg = if (onDark) Color.Black else Color.White
     val filled = emphasized && enabled
+    // Emphasized buttons carry the accent: solid accent on white, white on the dark bar.
+    val fill = if (onDark) Color.White else NotableStyle.Accent
     val content = when {
         !enabled -> Color.Gray
-        filled -> bg
+        filled -> if (onDark) Color.Black else NotableStyle.OnAccent
         else -> fg
     }
     Row(
         modifier = Modifier
             .height(40.dp)
             .clip(BUTTON_SHAPE)
-            .background(if (filled) fg else bg)
-            .border(1.dp, if (enabled) fg else Color.Gray, BUTTON_SHAPE)
+            .background(if (filled) fill else bg)
+            .border(1.dp, if (!enabled) Color.Gray else if (filled) fill else fg, BUTTON_SHAPE)
             .clickable(
                 enabled = enabled,
                 interactionSource = remember { MutableInteractionSource() },
