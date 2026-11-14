@@ -4,6 +4,23 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
+import com.ethran.notable.data.db.Page
+import com.ethran.notable.ui.components.NotableButton
+import com.ethran.notable.ui.theme.NotableStyle
+import compose.icons.feathericons.BookOpen
+import compose.icons.feathericons.Home
+import compose.icons.feathericons.Plus
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
@@ -126,6 +143,10 @@ fun Library(
 }
 
 
+/**
+ * The library, laid out for a landscape tablet: a sidebar for moving between folders, and a main
+ * area with the current folder's quick pages and notebooks in one scrolling grid.
+ */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 @Composable
 fun LibraryContent(
@@ -143,104 +164,107 @@ fun LibraryContent(
     onImportXopp: (Uri) -> Unit,
     onPreviewMissing: (String) -> Unit
 ) {
-    Column(Modifier.fillMaxSize()) {
-        Topbar {
-            Row(Modifier.fillMaxWidth()) {
-                Spacer(modifier = Modifier.weight(1f))
-                BadgedBox(
-                    badge = {
-                        if (!uiState.isLatestVersion) Badge(
-                            backgroundColor = Color.Black,
-                            modifier = Modifier.offset((-12).dp, 10.dp)
-                        )
-                    }) {
-                    Icon(
-                        imageVector = FeatherIcons.Settings, contentDescription = "Settings",
-                        Modifier
-                            .padding(8.dp)
-                            .noRippleClickable(onClick = onNavigateToSettings)
-                    )
-                }
-            }
-            Row(Modifier.padding(10.dp)) {
-                BreadCrumb(
-                    folders = uiState.breadcrumbFolders, onSelectFolderId = onNavigateToFolder
-                )
-            }
-
-        }
-
-        Column(Modifier.padding(10.dp)) {
-            Spacer(Modifier.height(10.dp))
-
-            FolderList(
-                appRepository = appRepository,
-                folders = uiState.folders,
-                onNavigateToFolder = onNavigateToFolder,
-                onCreateNewFolder = onCreateNewFolder
-            )
-
-            Spacer(Modifier.height(10.dp))
-            ShowPagesRow(
-                appRepository = appRepository,
-                pages = uiState.singlePages,
-                currentPageId = null,
-                title = stringResource(R.string.home_quick_pages), onSelectPage = goToPage,
-                showAddQuickPage = true,
+    Row(
+        Modifier
+            .fillMaxSize()
+            .background(Color.White)
+    ) {
+        LibrarySidebar(
+            appRepository = appRepository,
+            uiState = uiState,
+            onNavigateToFolder = onNavigateToFolder,
+            onNavigateToSettings = onNavigateToSettings,
+            onCreateNewFolder = onCreateNewFolder
+        )
+        Box(
+            Modifier
+                .fillMaxHeight()
+                .width(2.dp)
+                .background(Color.Black)
+        )
+        Column(
+            Modifier
+                .weight(1f)
+                .fillMaxHeight()
+        ) {
+            LibraryHeader(
+                uiState = uiState,
                 onCreateNewQuickPage = onCreateNewQuickPage,
-                onPreviewMissing = onPreviewMissing
+                onCreateNewNotebook = onCreateNewNotebook,
+                onImportPdf = onImportPdf,
+                onImportXopp = onImportXopp
             )
-
-            Spacer(Modifier.height(10.dp))
-
             NotebookGrid(
+                appRepository = appRepository,
                 books = uiState.books,
+                singlePages = uiState.singlePages,
                 isImporting = uiState.isImporting,
                 syncBadges = uiState.syncBadges,
                 onNavigateToEditor = onNavigateToEditor,
+                goToPage = goToPage,
                 onDeleteEmptyBook = onDeleteEmptyBook,
-                onCreateNewNotebook = onCreateNewNotebook,
-                onImportPdf = onImportPdf,
-                onImportXopp = onImportXopp,
                 onPreviewMissing = onPreviewMissing
             )
         }
     }
-
-
 }
 
+/**
+ * Left rail: the app name, where you are (Library › folder › folder, as a tree), the folders
+ * inside the current one, and Settings pinned to the bottom.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun FolderList(
+private fun LibrarySidebar(
     appRepository: AppRepository,
-    folders: List<Folder>,
-    onNavigateToFolder: (String) -> Unit, onCreateNewFolder: () -> Unit
+    uiState: LibraryUiState,
+    onNavigateToFolder: (String?) -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onCreateNewFolder: () -> Unit
 ) {
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .autoEInkAnimationOnScroll()
+    val path = uiState.breadcrumbFolders
+    Column(
+        Modifier
+            .width(250.dp)
+            .fillMaxHeight()
+            .padding(horizontal = 14.dp, vertical = 18.dp)
     ) {
-        item {
-            // Add new folder row
-            Row(
-                Modifier
-                    .border(0.5.dp, Color.Black)
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
-                    .noRippleClickable(onClick = onCreateNewFolder)
-            ) {
-                Icon(
-                    imageVector = FeatherIcons.FolderPlus, contentDescription = "Add Folder",
-                    Modifier.height(20.dp)
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(text = stringResource(R.string.home_add_new_folder))
-            }
+        Text(
+            text = "Notable",
+            fontSize = 28.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color.Black,
+            modifier = Modifier.padding(start = 10.dp, bottom = 18.dp)
+        )
+
+        // Where you are. The last entry is the open folder.
+        SidebarItem(
+            icon = FeatherIcons.Home,
+            label = stringResource(R.string.home_view_name),
+            selected = path.isEmpty(),
+            onClick = { onNavigateToFolder(null) }
+        )
+        path.forEachIndexed { index, folder ->
+            SidebarItem(
+                icon = FeatherIcons.Folder,
+                label = folder.title,
+                selected = index == path.lastIndex,
+                indent = ((index + 1) * 14).coerceAtMost(56),
+                onClick = { onNavigateToFolder(folder.id) }
+            )
         }
 
-        if (folders.isNotEmpty()) {
-            items(folders) { folder ->
+        Spacer(Modifier.height(18.dp))
+        SectionLabel("Folders")
+        Spacer(Modifier.height(6.dp))
+
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .autoEInkAnimationOnScroll()
+        ) {
+            items(uiState.folders, key = { it.id }) { folder ->
                 var isFolderSettingsOpen by remember { mutableStateOf(false) }
                 if (isFolderSettingsOpen) FolderConfigDialog(
                     appRepository.folderRepository,
@@ -249,52 +273,252 @@ fun FolderList(
                         log.i("Closing Directory Dialog")
                         isFolderSettingsOpen = false
                     })
-                Row(
-                    Modifier
-                        .combinedClickable(
-                            onClick = { onNavigateToFolder(folder.id) },
-                            onLongClick = { isFolderSettingsOpen = true })
-                        .border(0.5.dp, Color.Black)
-                        .padding(10.dp, 5.dp)
-                ) {
-                    Icon(
-                        imageVector = FeatherIcons.Folder, contentDescription = "Folder",
-                        Modifier.height(20.dp)
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(text = folder.title)
-                }
+                SidebarItem(
+                    icon = FeatherIcons.Folder,
+                    label = folder.title,
+                    onClick = { onNavigateToFolder(folder.id) },
+                    onLongClick = { isFolderSettingsOpen = true }
+                )
             }
+            item {
+                SidebarItem(
+                    icon = FeatherIcons.FolderPlus,
+                    label = stringResource(R.string.home_add_new_folder),
+                    onClick = onCreateNewFolder
+                )
+            }
+        }
+
+        Box(
+            Modifier
+                .padding(vertical = 8.dp)
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(Color.Black)
+        )
+        SidebarItem(
+            icon = FeatherIcons.Settings,
+            label = stringResource(R.string.settings_title),
+            showDot = !uiState.isLatestVersion,
+            onClick = onNavigateToSettings
+        )
+    }
+}
+
+/** One row of the sidebar. The [selected] row is filled with the accent color. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SidebarItem(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    selected: Boolean = false,
+    indent: Int = 0,
+    showDot: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
+) {
+    val content = if (selected) NotableStyle.OnAccent else Color.Black
+    Row(
+        Modifier
+            .padding(start = indent.dp, top = 2.dp, bottom = 2.dp)
+            .fillMaxWidth()
+            .height(44.dp)
+            .clip(NotableStyle.ControlShape)
+            .background(if (selected) NotableStyle.Accent else Color.White)
+            .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = content,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = label,
+            color = content,
+            fontSize = 16.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        if (showDot) {
+            // An update is available.
+            Box(
+                Modifier
+                    .size(10.dp)
+                    .background(NotableStyle.Accent, CircleShape)
+            )
         }
     }
 }
 
+/** Small all-caps label above a group, optionally with a count. */
 @Composable
-fun NotebookGrid(
-    books: List<Notebook>,
-    isImporting: Boolean,
-    syncBadges: Map<String, SyncBadge>,
-    onNavigateToEditor: (String, String) -> Unit,
-    onDeleteEmptyBook: (String) -> Unit,
+private fun SectionLabel(text: String, count: Int? = null, modifier: Modifier = Modifier) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = text.uppercase(),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.2.sp,
+            color = Color.Black,
+            modifier = Modifier.padding(start = 10.dp)
+        )
+        if (count != null) {
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = count.toString(),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier
+                    .background(Color.Black, CircleShape)
+                    .padding(horizontal = 8.dp, vertical = 1.dp)
+            )
+        }
+    }
+}
+
+/** Title of the open folder, with the actions that create things in it. */
+@Composable
+private fun LibraryHeader(
+    uiState: LibraryUiState,
+    onCreateNewQuickPage: () -> Unit,
     onCreateNewNotebook: () -> Unit,
     onImportPdf: (Uri, Boolean) -> Unit,
     onImportXopp: (Uri) -> Unit,
+) {
+    val path = uiState.breadcrumbFolders
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 28.dp, end = 24.dp, top = 20.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = path.lastOrNull()?.title ?: stringResource(R.string.home_view_name),
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (path.size > 1) {
+                Text(
+                    text = path.dropLast(1).joinToString("  ›  ") { it.title },
+                    fontSize = 14.sp,
+                    color = Color.DarkGray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        Spacer(Modifier.width(16.dp))
+        NotebookImportPanel(
+            onCreateNewNotebook = onCreateNewNotebook,
+            onCreateNewQuickPage = onCreateNewQuickPage,
+            onImportPdf = onImportPdf,
+            onImportXopp = onImportXopp
+        )
+    }
+}
+
+/**
+ * Everything in the open folder, in one scrolling grid: the quick pages as a row across the
+ * top, then the notebooks.
+ */
+@Composable
+fun NotebookGrid(
+    appRepository: AppRepository,
+    books: List<Notebook>,
+    singlePages: List<Page>,
+    isImporting: Boolean,
+    syncBadges: Map<String, SyncBadge>,
+    onNavigateToEditor: (String, String) -> Unit,
+    goToPage: (String) -> Unit,
+    onDeleteEmptyBook: (String) -> Unit,
     onPreviewMissing: (String) -> Unit
 ) {
-    Text(text = stringResource(R.string.home_notebooks))
-    Spacer(Modifier.height(10.dp))
+    val notebookCount = books.count { it.pageIds.isNotEmpty() }
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(100.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.autoEInkAnimationOnScroll()
+        columns = GridCells.Adaptive(150.dp),
+        contentPadding = PaddingValues(start = 28.dp, end = 28.dp, top = 8.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(22.dp),
+        horizontalArrangement = Arrangement.spacedBy(22.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .autoEInkAnimationOnScroll()
     ) {
-        item {
-            NotebookImportPanel(
-                onCreateNewNotebook = onCreateNewNotebook,
-                onImportPdf = onImportPdf,
-                onImportXopp = onImportXopp
+        if (singlePages.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Column {
+                    SectionLabel(
+                        stringResource(R.string.home_quick_pages),
+                        count = singlePages.size,
+                        modifier = Modifier.offset(x = (-10).dp)
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    ShowPagesRow(
+                        appRepository = appRepository,
+                        pages = singlePages,
+                        currentPageId = null,
+                        title = null,
+                        onSelectPage = goToPage,
+                        onPreviewMissing = onPreviewMissing
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+        }
+
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            SectionLabel(
+                stringResource(R.string.home_notebooks),
+                count = notebookCount,
+                modifier = Modifier.offset(x = (-10).dp)
             )
+        }
+
+        if (notebookCount == 0) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(NotableStyle.PanelShape)
+                        .border(1.5.dp, Color.Black, NotableStyle.PanelShape)
+                        .padding(vertical = 36.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.BookOpen,
+                        contentDescription = null,
+                        tint = Color.Black,
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "No notebooks here yet",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                    Text(
+                        "Use New notebook or Import, at the top right.",
+                        fontSize = 14.sp,
+                        color = Color.DarkGray
+                    )
+                }
+            }
         }
 
         if (books.isNotEmpty()) {
@@ -342,9 +566,11 @@ fun NotebookGrid(
     }
 }
 
+/** The create actions for the open folder: quick page, import (PDF or xopp), new notebook. */
 @Composable
 fun NotebookImportPanel(
     onCreateNewNotebook: () -> Unit,
+    onCreateNewQuickPage: () -> Unit,
     onImportPdf: (Uri, Boolean) -> Unit,
     onImportXopp: (Uri) -> Unit,
     modifier: Modifier = Modifier
@@ -363,83 +589,59 @@ fun NotebookImportPanel(
         }, onDismiss = { showPdfImportChoiceDialog = null })
     }
 
-
-    Box(
-        modifier = modifier
-            .width(100.dp)
-            .aspectRatio(3f / 4f)
-            .border(1.dp, Color.Gray, RectangleShape),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Create New Notebook Button (Top Half)
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .weight(1f) // Takes half the height
-                    .fillMaxWidth()
-                    .background(Color.LightGray.copy(alpha = 0.3f))
-                    .border(2.dp, Color.Black, RectangleShape)
-                    .noRippleClickable(onClick = onCreateNewNotebook)
-            ) {
-                Icon(
-                    imageVector = FeatherIcons.FilePlus, contentDescription = "Create Notebook",
-                    tint = Color.Gray, modifier = Modifier.size(40.dp)
-                )
-            }
-
-            val launcher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.OpenDocument()
-            ) { uri: Uri? ->
-                if (uri == null) {
-                    log.w("PickVisualMedia: uri is null (user cancelled or provider returned null)")
-                    return@rememberLauncherForActivityResult
-                }
-                try {
-
-                    val mimeType = context.contentResolver.getType(uri)
-                    log.d("Selected file mimeType: $mimeType, uri: $uri")
-                    if (mimeType == "application/pdf" || uri.toString()
-                            .endsWith(".pdf", ignoreCase = true)
-                    ) {
-                        showPdfImportChoiceDialog = uri
-                    } else {
-                        onImportXopp(uri)
-                    }
-                } catch (e: Exception) {
-                    log.e("contentPicker failed: ${e.message}", e)
-                    snackState.showOrUpdateSnack(SnackConf(text = "Importing failed: ${e.message}"))
-                }
-            }
-            // Import Notebook (Bottom Half)
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .background(Color.LightGray.copy(alpha = 0.3f))
-                    .border(2.dp, Color.Black, RectangleShape)
-                    .noRippleClickable {
-                        launcher.launch(
-                            arrayOf(
-                                "application/x-xopp",
-                                "application/gzip",
-                                "application/octet-stream",
-                                "application/pdf"
-                            )
-                        )
-                    }
-
-            ) {
-                Icon(
-                    imageVector = FeatherIcons.Upload,
-                    contentDescription = "Import Notebook",
-                    tint = Color.Gray,
-                    modifier = Modifier.size(40.dp),
-                )
-            }
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri == null) {
+            log.w("PickVisualMedia: uri is null (user cancelled or provider returned null)")
+            return@rememberLauncherForActivityResult
         }
+        try {
+            val mimeType = context.contentResolver.getType(uri)
+            log.d("Selected file mimeType: $mimeType, uri: $uri")
+            if (mimeType == "application/pdf" || uri.toString()
+                    .endsWith(".pdf", ignoreCase = true)
+            ) {
+                showPdfImportChoiceDialog = uri
+            } else {
+                onImportXopp(uri)
+            }
+        } catch (e: Exception) {
+            log.e("contentPicker failed: ${e.message}", e)
+            snackState.showOrUpdateSnack(SnackConf(text = "Importing failed: ${e.message}"))
+        }
+    }
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        NotableButton(
+            text = "Quick page",
+            icon = FeatherIcons.FilePlus,
+            onClick = onCreateNewQuickPage
+        )
+        NotableButton(
+            text = "Import",
+            icon = FeatherIcons.Upload,
+            onClick = {
+                launcher.launch(
+                    arrayOf(
+                        "application/x-xopp",
+                        "application/gzip",
+                        "application/octet-stream",
+                        "application/pdf"
+                    )
+                )
+            }
+        )
+        NotableButton(
+            text = stringResource(R.string.new_notebook_screen_title),
+            icon = FeatherIcons.Plus,
+            primary = true,
+            onClick = onCreateNewNotebook
+        )
     }
 }
 

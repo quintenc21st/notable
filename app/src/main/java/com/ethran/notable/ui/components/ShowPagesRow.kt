@@ -22,8 +22,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.ethran.notable.ui.theme.NotableStyle
 import androidx.navigation.NavController
 import com.ethran.notable.data.AppRepository
 import com.ethran.notable.data.db.Page
@@ -49,12 +52,12 @@ fun ShowPagesRow(
 ) {
 
     if (title != null) {
-        Text(text = title)
+        Text(text = title, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(10.dp))
     }
 
     LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier
             .fillMaxWidth()
             .autoEInkAnimationOnScroll()
@@ -65,9 +68,10 @@ fun ShowPagesRow(
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .width(100.dp)
+                        .width(120.dp)
                         .aspectRatio(3f / 4f)
-                        .border(1.dp, Color.Gray, RectangleShape)
+                        .clip(NotableStyle.SmallShape)
+                        .border(1.5.dp, Color.Black, NotableStyle.SmallShape)
                         .noRippleClickable {
                             onCreateNewQuickPage()
 
@@ -75,8 +79,8 @@ fun ShowPagesRow(
                     Icon(
                         imageVector = FeatherIcons.FilePlus,
                         contentDescription = "Add Quick Page",
-                        tint = Color.Gray,
-                        modifier = Modifier.size(40.dp),
+                        tint = Color.Black,
+                        modifier = Modifier.size(32.dp),
                     )
                 }
             }
@@ -97,12 +101,13 @@ fun ShowPagesRow(
                                     isPageSelected = true
                                 },
                             )
-                            .width(100.dp)
+                            .width(120.dp)
                             .aspectRatio(3f / 4f)
+                            .clip(NotableStyle.SmallShape)
                             .border(
-                                if (currentPageId == pageId) 4.dp else 1.dp,
-                                Color.Black,
-                                RectangleShape
+                                if (currentPageId == pageId) 4.dp else 1.5.dp,
+                                if (currentPageId == pageId) NotableStyle.Accent else Color.Black,
+                                NotableStyle.SmallShape
                             ),
                         pageId = pageId,
                         onPreviewMissing = onPreviewMissing

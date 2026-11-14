@@ -28,6 +28,23 @@ object NotableStyle {
 
     /** Small things inside controls: toolbar buttons, thumbnails. */
     val SmallShape = RoundedCornerShape(8.dp)
+
+    /**
+     * Spine colors for notebook covers. Deep, saturated hues: they stay distinguishable on a
+     * color e-ink panel and all read as "dark" on a monochrome one.
+     */
+    private val NotebookColors = listOf(
+        Color(0xFF1565C0), // blue
+        Color(0xFFC62828), // red
+        Color(0xFF2E7D32), // green
+        Color(0xFFEF6C00), // orange
+        Color(0xFF6A1B9A), // purple
+        Color(0xFF00838F), // teal
+    )
+
+    /** A stable color for the notebook with this id, so each one keeps its own spine. */
+    fun notebookColor(notebookId: String): Color =
+        NotebookColors[(notebookId.hashCode() and 0x7fffffff) % NotebookColors.size]
 }
 
 /** White rounded surface with a bold outline — the standard floating panel. */

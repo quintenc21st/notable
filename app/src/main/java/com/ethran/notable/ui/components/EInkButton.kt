@@ -7,12 +7,12 @@ import androidx.compose.material.OutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.dp
+import com.ethran.notable.ui.theme.NotableStyle
 
 /**
- * Pure black-on-white, square-cornered button — no theme grays, e-ink friendly. [inverted] makes
- * it white on black, for the main action or the selected option.
+ * Flat, rounded button — no theme grays, e-ink friendly. [inverted] fills it with the accent
+ * color, for the main action or the selected option.
  */
 @Composable
 fun EInkButton(
@@ -24,11 +24,11 @@ fun EInkButton(
     OutlinedButton(
         onClick = onClick,
         modifier = modifier,
-        shape = RectangleShape,
-        border = BorderStroke(1.dp, Color.Black),
+        shape = NotableStyle.ControlShape,
+        border = BorderStroke(1.5.dp, if (inverted) NotableStyle.Accent else Color.Black),
         colors = ButtonDefaults.outlinedButtonColors(
-            backgroundColor = if (inverted) Color.Black else Color.White,
-            contentColor = if (inverted) Color.White else Color.Black,
+            backgroundColor = if (inverted) NotableStyle.Accent else Color.White,
+            contentColor = if (inverted) NotableStyle.OnAccent else Color.Black,
         ),
         content = content,
     )

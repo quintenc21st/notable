@@ -11,7 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -35,17 +35,18 @@ fun BreadCrumb(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
+        // The place you are in is bold; the way back to it is regular weight.
         Text(
             text = stringResource(R.string.home_view_name),
             fontSize = fontSize.sp,
-            textDecoration = TextDecoration.Underline,
+            fontWeight = if (folders.isEmpty()) FontWeight.Bold else FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .padding(end = 2.dp)
                 .noRippleClickable { onSelectFolderId(null) })
 
-        folders.forEach { f ->
+        folders.forEachIndexed { index, f ->
             Icon(
                 imageVector = Icons.Filled.ChevronRight, contentDescription = null,
                 modifier = Modifier.padding(horizontal = 2.dp)
@@ -53,7 +54,7 @@ fun BreadCrumb(
             Text(
                 text = f.title,
                 fontSize = fontSize.sp,
-                textDecoration = TextDecoration.Underline,
+                fontWeight = if (index == folders.lastIndex) FontWeight.Bold else FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.noRippleClickable { onSelectFolderId(f.id) })
