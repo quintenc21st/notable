@@ -8,19 +8,24 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.ethran.notable.data.datastore.AppSettings
 import com.ethran.notable.data.datastore.BUTTON_SIZE
+import com.ethran.notable.data.datastore.SIDE_TOOLBAR_WIDTH
 import com.ethran.notable.data.datastore.GlobalAppSettings
 import com.ethran.notable.editor.ToolbarAction
 import com.ethran.notable.editor.ToolbarUiState
@@ -96,13 +101,58 @@ fun ToolbarContent(
         }
     }
 
+    val position = LocalToolbarPosition.current
+    if (position.isVertical) {
+        // Side toolbar: the same zones, top to bottom. The hairline faces the page.
+        Row(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(SIDE_TOOLBAR_WIDTH.dp)
+        ) {
+            if (position == AppSettings.Position.Right) VerticalHairline()
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .background(Color.White),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Structural: the toggle is always first, never part of the layout.
+                ToolbarElementView(
+                    element = ToolbarElements.of(ToolbarElementId.TOGGLE),
+                    uiState = uiState,
+                    onAction = onAction,
+                    onPickImage = {},
+                )
+                ToolbarVerticalDivider()
+
+                // Upper zone: scrolls vertically.
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    renderZone(layout.scrollable)
+                }
+
+                // Lower zone: pinned.
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    renderZone(layout.pinned)
+                }
+            }
+            if (position == AppSettings.Position.Left) VerticalHairline()
+        }
+        return
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .height((BUTTON_SIZE + 2).dp)
             .padding(bottom = 1.dp)
     ) {
-        if (settings.toolbarPosition == AppSettings.Position.Bottom) {
+        if (position == AppSettings.Position.Bottom) {
             HorizontalHairline()
         }
         Row(
@@ -158,6 +208,16 @@ private fun CollapsedToolbarButton(
         modifier = Modifier
             .height((BUTTON_SIZE + 1).dp)
             .padding(bottom = 1.dp)
+    )
+}
+
+@Composable
+private fun VerticalHairline() {
+    Box(
+        Modifier
+            .fillMaxHeight()
+            .width(1.dp)
+            .background(Color.Black)
     )
 }
 

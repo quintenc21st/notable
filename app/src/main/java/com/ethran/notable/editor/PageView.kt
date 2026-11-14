@@ -36,6 +36,7 @@ import com.ethran.notable.editor.drawing.drawOnCanvasFromPage
 import com.ethran.notable.editor.utils.div
 import com.ethran.notable.editor.utils.divideStrokesFromCut
 import com.ethran.notable.editor.utils.loadHQPagePreview
+import com.ethran.notable.editor.utils.pageFitZoom
 import com.ethran.notable.editor.utils.minus
 import com.ethran.notable.editor.utils.plus
 import com.ethran.notable.editor.utils.strokeBounds
@@ -165,6 +166,24 @@ class PageView(
     val zoom: Float
         get() = viewportFlow.value.zoom
 
+    /**
+     * The zoom at which the page exactly fills the view's width. A page is as wide as the screen
+     * held in portrait, so this is 1 in portrait and larger in landscape. It is the zoom pages
+     * open at and "reset view" returns to.
+     */
+    val fitZoom: Float
+        get() {
+            val pageWidth = min(SCREEN_WIDTH, SCREEN_HEIGHT)
+            if (pageWidth <= 0 || viewWidth <= 0) return 1f
+            val fit = viewWidth.toFloat() / pageWidth
+            // Don't rescale everything for a rounding error's worth of difference.
+            return if (abs(fit - 1f) < 0.01f) 1f else fit
+        }
+
+    init {
+        pageFitZoom = fitZoom
+    }
+
     // Pages this view has shown and left, with the viewport they had. Guarded by pageLock.
     private val leftPages = HashMap<String, PageViewport>()
 
@@ -289,9 +308,12 @@ class PageView(
         return PreparedPage(page, viewport, shelved ?: newBitmap(page, viewport), fromShelf = shelved != null)
     }
 
-    /** The viewport [page] had when this view left it, or else unzoomed at its saved scroll. */
+    /** The viewport [page] had when this view left it, or else fitted to the width at its saved scroll. */
     private fun viewportToShow(page: OpenPage): PageViewport = synchronized(pageLock) {
-        leftPages[page.pageId] ?: PageViewport(scroll = Offset(0f, (page.record?.scroll ?: 0).toFloat()))
+        leftPages[page.pageId] ?: PageViewport(
+            scroll = Offset(0f, (page.record?.scroll ?: 0).toFloat()),
+            zoom = fitZoom
+        )
     }
 
     /**
@@ -677,18 +699,20 @@ class PageView(
         currentZoom: Float,
     ): Float {
         // TODO: Better snapping logic
-        val portraitRatio = SCREEN_WIDTH.toFloat() / SCREEN_HEIGHT
+        // Two resting zooms: the page fitted to the view's width, and one step out from it —
+        // actual size in landscape, or the landscape field of view in portrait.
+        val fit = fitZoom
+        val other =
+            if (SCREEN_WIDTH > SCREEN_HEIGHT) 1.0f else SCREEN_WIDTH.toFloat() / SCREEN_HEIGHT
+        val zoomedOut = min(fit, other)
+        val zoomedIn = max(fit, other)
 
         return if (!GlobalAppSettings.current.continuousZoom) {
-            // Discrete zoom mode - snap to either 1.0 or screen ratio.
+            // Discrete zoom mode - snap to one of the two resting zooms.
             // scaleDelta is a growth ratio minus 1 (see PointerTracker.pinchRatio),
             // so it is negative when pinching in (zoom out) and positive when
             // spreading (zoom in); split on 0, not 1.
-            if (scaleDelta <= 0f) {
-                if (SCREEN_HEIGHT > SCREEN_WIDTH) portraitRatio else 1.0f
-            } else {
-                if (SCREEN_HEIGHT > SCREEN_WIDTH) 1.0f else portraitRatio
-            }
+            if (scaleDelta <= 0f) zoomedOut else zoomedIn
         } else {
             // Continuous zoom: scaleDelta is the per-frame growth ratio minus 1,
             // so the zoom scales multiplicatively. ZOOM_SENSITIVITY damps how
@@ -697,11 +721,11 @@ class PageView(
             val newZoom =
                 (currentZoom * (1f + scaleDelta * ZOOM_SENSITIVITY)).coerceIn(MIN_ZOOM, MAX_ZOOM)
 
-            // Snap to either 1.0 or screen ratio depending on which is closer
-            val snapTarget = if (abs(newZoom - 1.0f) < abs(newZoom - portraitRatio)) {
-                1.0f
+            // Snap to whichever resting zoom is closer
+            val snapTarget = if (abs(newZoom - zoomedOut) < abs(newZoom - zoomedIn)) {
+                zoomedOut
             } else {
-                portraitRatio
+                zoomedIn
             }
 
             if (abs(newZoom - snapTarget) < ZOOM_SNAP_THRESHOLD) {
@@ -731,11 +755,11 @@ class PageView(
         redrawAt(pageId, start.copy(zoom = newZoomLevel))
     }
 
-    /** Unzooms the page and scrolls it back to its left edge, keeping its vertical scroll. */
+    /** Fits the page to the width again and scrolls it back to its left edge, keeping its vertical scroll. */
     suspend fun resetView(pageId: String) {
         waitForDrawingWithSnack()
         val start = viewportStart(pageId) ?: return
-        redrawAt(pageId, PageViewport(scroll = Offset(0f, start.scroll.y)))
+        redrawAt(pageId, PageViewport(scroll = Offset(0f, start.scroll.y), zoom = fitZoom))
     }
 
     /** Moves [pageId]'s view to [next] and redraws it whole. */
@@ -955,10 +979,12 @@ class PageView(
 
     private fun updateCanvasDimensions() {
         checkMainThread("updateDimensions")
-        // A zoom fitted to the old size does not fit the new one, on any page.
+        // A zoom fitted to the old size does not fit the new one, on any page: refit them all.
+        val fit = fitZoom
+        pageFitZoom = fit
         synchronized(pageLock) {
-            viewportFlow.update { it.copy(zoom = 1f) }
-            leftPages.replaceAll { _, left -> left.copy(zoom = 1f) }
+            viewportFlow.update { it.copy(zoom = fit) }
+            leftPages.replaceAll { _, left -> left.copy(zoom = fit) }
         }
         // Blank at the new size, rather than read from disk on the main thread; the redraw below
         // fills it.

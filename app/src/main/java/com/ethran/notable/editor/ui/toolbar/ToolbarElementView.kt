@@ -113,39 +113,7 @@ fun ToolbarElementView(
                     onSelect = onPickImage,
                 )
 
-            CustomKind.PAGE_NAV -> {
-                // A pill, so it reads as a button; filled with the accent while the
-                // pages popup it opens is showing.
-                val open = uiState.isPagesPopupOpen
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .height(BUTTON_SIZE.dp)
-                        .padding(horizontal = 6.dp, vertical = 4.dp)
-                        .noRippleClickable {
-                            onAction(ToolbarAction.TogglePagesPopup(!open))
-                        }
-                        .background(
-                            if (open) NotableStyle.Accent else Color.White,
-                            NotableStyle.ControlShape
-                        )
-                        .border(
-                            1.dp,
-                            if (open) NotableStyle.Accent else Color.Black,
-                            NotableStyle.ControlShape
-                        )
-                        .padding(horizontal = 10.dp)
-                ) {
-                    Text(
-                        text = uiState.pageNumberInfo,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 15.sp,
-                        color = if (open) NotableStyle.OnAccent else Color.Black,
-                        maxLines = 1,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
+            CustomKind.PAGE_NAV -> PageNavButton(uiState, onAction)
 
             CustomKind.MENU ->
                 Column {
@@ -252,20 +220,15 @@ private fun EraserSubmenu(
     uiState: ToolbarUiState,
     onAction: (ToolbarAction) -> Unit,
 ) {
-    val density = LocalDensity.current
+    val (alignment, offset) = toolbarPopupPlacement()
 
     ScaledPopup(
-        offset = with(density) {
-            IntOffset(
-                0,
-                43.dp.roundToPx()
-            )
-        },
+        offset = offset,
         onDismissRequest = {
             onAction(ToolbarAction.ToggleEraserManu(false))
         },
         properties = PopupProperties(focusable = true),
-        alignment = Alignment.TopCenter
+        alignment = alignment
     ) {
         Column(
             modifier = Modifier
@@ -347,8 +310,87 @@ private fun EraserSubmenu(
     }
 }
 
+/**
+ * The page number, as a pill so it reads as a button; filled with the accent while the pages
+ * popup it opens is showing. On a side toolbar there is no room for "12/34" on one line, so
+ * the page sits above the total.
+ */
+@Composable
+private fun PageNavButton(
+    uiState: ToolbarUiState,
+    onAction: (ToolbarAction) -> Unit,
+) {
+    val open = uiState.isPagesPopupOpen
+    val content = if (open) NotableStyle.OnAccent else Color.Black
+    val pill = Modifier
+        .noRippleClickable { onAction(ToolbarAction.TogglePagesPopup(!open)) }
+        .background(if (open) NotableStyle.Accent else Color.White, NotableStyle.ControlShape)
+        .border(
+            1.dp, if (open) NotableStyle.Accent else Color.Black, NotableStyle.ControlShape
+        )
+
+    if (LocalToolbarPosition.current.isVertical) {
+        val current = uiState.pageNumberInfo.substringBefore('/')
+        val total = uiState.pageNumberInfo.substringAfter('/', "")
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 3.dp, vertical = 4.dp)
+                .fillMaxWidth()
+                .then(pill)
+                .padding(vertical = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = current,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                color = content,
+                maxLines = 1
+            )
+            if (total.isNotEmpty()) {
+                Box(
+                    Modifier
+                        .padding(vertical = 2.dp)
+                        .width(14.dp)
+                        .height(1.dp)
+                        .background(content)
+                )
+                Text(text = total, fontSize = 11.sp, color = content, maxLines = 1)
+            }
+        }
+    } else {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .height(BUTTON_SIZE.dp)
+                .padding(horizontal = 6.dp, vertical = 4.dp)
+                .then(pill)
+                .padding(horizontal = 10.dp)
+        ) {
+            Text(
+                text = uiState.pageNumberInfo,
+                fontWeight = FontWeight.Medium,
+                fontSize = 15.sp,
+                color = content,
+                maxLines = 1,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+/** Separator between toolbar groups: across the bar, whichever way the bar runs. */
 @Composable
 internal fun ToolbarVerticalDivider() {
+    if (LocalToolbarPosition.current.isVertical) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(0.5.dp)
+                .background(Color.Black)
+        )
+        return
+    }
     Box(
         Modifier
             .fillMaxHeight()

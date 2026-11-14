@@ -58,11 +58,12 @@ fun StrokeMenu(
     val columnModifier =
         if (GlobalAppSettings.current.continuousStrokeSlider) Modifier.notablePanel()
         else Modifier
+    val (alignment, offset) = toolbarPopupPlacement()
     ScaledPopup(
-        offset = with(density) { IntOffset(0, 43.dp.roundToPx()) },
+        offset = offset,
         onDismissRequest = { onClose() },
         properties = PopupProperties(focusable = true),
-        alignment = Alignment.TopCenter
+        alignment = alignment
     ) {
 
         Column(
@@ -77,8 +78,7 @@ fun StrokeMenu(
             val widthOfPicker = (35 * colorOptions.size.coerceAtLeast(5))
             val heightOfPicker = 40
 
-            val isBottom =
-                GlobalAppSettings.current.toolbarPosition == AppSettings.Position.Bottom
+            val isBottom = LocalToolbarPosition.current == AppSettings.Position.Bottom
 
             if (isBottom) {
                 // Show size first, then colors

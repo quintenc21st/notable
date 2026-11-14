@@ -23,14 +23,26 @@ fun GeneralSettings(
             ), value = settings.defaultNativeTemplate, onValueChange = {
                 onSettingsChange(settings.copy(defaultNativeTemplate = it))
             })
+        // The toolbar has a position per way of holding the device: it follows rotation.
+        val toolbarPositions = listOf(
+            AppSettings.Position.Top to stringResource(R.string.toolbar_position_top),
+            AppSettings.Position.Bottom to stringResource(R.string.toolbar_position_bottom),
+            AppSettings.Position.Left to stringResource(R.string.toolbar_position_left),
+            AppSettings.Position.Right to stringResource(R.string.toolbar_position_right),
+        )
         SelectorRow(
-            label = stringResource(R.string.toolbar_position), options = listOf(
-                AppSettings.Position.Top to stringResource(R.string.toolbar_position_top),
-                AppSettings.Position.Bottom to stringResource(
-                    R.string.toolbar_position_bottom
-                )
-            ), value = settings.toolbarPosition, onValueChange = { newPosition ->
+            label = stringResource(R.string.toolbar_position_portrait),
+            options = toolbarPositions,
+            value = settings.toolbarPosition,
+            onValueChange = { newPosition ->
                 onSettingsChange(settings.copy(toolbarPosition = newPosition))
+            })
+        SelectorRow(
+            label = stringResource(R.string.toolbar_position_landscape),
+            options = toolbarPositions,
+            value = settings.toolbarPositionLandscape,
+            onValueChange = { newPosition ->
+                onSettingsChange(settings.copy(toolbarPositionLandscape = newPosition))
             })
         SelectorRow(
             label = stringResource(R.string.link_format), options = listOf(

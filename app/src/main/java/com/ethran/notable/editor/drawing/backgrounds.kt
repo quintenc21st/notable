@@ -40,8 +40,14 @@ private val defaultPaint = Paint().apply {
 
 // For drawing Hexagons
 private val defaultPaintStroke = defaultPaint.copy().apply { this.style = Paint.Style.STROKE }
+// Ruled lines: darker and twice as thick as the grid/dot paint, so they hold up on e-ink, where
+// a 1px mid-grey line dithers to almost nothing.
+private val ruledLinePaint = Paint().apply {
+    this.color = Color.rgb(0x5A, 0x5A, 0x5A)
+    this.strokeWidth = 2f
+}
 private val marginPaint = Paint().apply {
-    this.color = Color.MAGENTA
+    this.color = Color.GRAY
     this.strokeWidth = 2f
 }
 private val paginationLinePaint = Paint().apply {
@@ -68,7 +74,7 @@ fun drawLinedBg(canvas: Canvas, scroll: Offset, scale: Float) {
             y.toFloat() + offset.y,
             (width - padding).toFloat(),
             y.toFloat() + offset.y,
-            defaultPaint
+            ruledLinePaint
         )
     }
 }
@@ -335,9 +341,11 @@ fun drawBg(
 
 // TODO: make sure it respects horizontal scroll
 fun drawMargin(canvas: Canvas, scroll: Offset, scale: Float) {
-    // in landscape orientation add margin to indicate what will be visible in vertical orientation.
-    if (SCREEN_WIDTH > SCREEN_HEIGHT || scale < 1.0f || scroll.x > 1) {
-        val margin = min(SCREEN_HEIGHT, SCREEN_WIDTH) - scroll.x
+    // Marks the page's right edge, but only when it is inside the view: zoomed out past the
+    // page's width, or scrolled sideways. A page fitted to the width shows no line.
+    val margin = min(SCREEN_HEIGHT, SCREEN_WIDTH) - scroll.x
+    val viewWidthOnPage = canvas.width / scale
+    if (margin < viewWidthOnPage - 2f) {
         // Draw vertical line with x= SCREEN_HEIGHT
         canvas.drawLine(
             margin, padding.toFloat(), margin, (SCREEN_HEIGHT / scale - padding), marginPaint

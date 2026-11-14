@@ -17,6 +17,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Velocity
 import com.ethran.notable.data.datastore.AppSettings
 import com.ethran.notable.data.datastore.GlobalAppSettings
+import com.ethran.notable.data.datastore.currentToolbarPosition
 import com.ethran.notable.utils.logCallStack
 import com.onyx.android.sdk.api.device.epd.EpdController
 import com.onyx.android.sdk.api.device.epd.EpdController.SCHEME_NORMAL
@@ -154,19 +155,28 @@ fun setupSurface(view: View, touchHelper: TouchHelper?, toolbarHeight: Int) {
     val viewWidth = view.width
     val viewHeight = view.height
 
-    // Determine the exclusion area based on toolbar position
-    val excludeRect: Rect =
-        if (GlobalAppSettings.current.toolbarPosition == AppSettings.Position.Top) {
-            Rect(0, 0, viewWidth, toolbarHeight)
-        } else {
-            Rect(0, viewHeight - toolbarHeight, viewWidth, viewHeight)
+    // Determine the exclusion area based on toolbar position. A top or bottom toolbar lies over
+    // the drawing surface, so its strip is excluded. A side toolbar sits beside the surface (the
+    // editor makes room for it), so the whole surface is drawable.
+    val excludeRect: Rect
+    val limitRect: Rect
+    when (currentToolbarPosition()) {
+        AppSettings.Position.Top -> {
+            excludeRect = Rect(0, 0, viewWidth, toolbarHeight)
+            limitRect = Rect(0, toolbarHeight, viewWidth, viewHeight)
         }
 
-    val limitRect =
-        if (GlobalAppSettings.current.toolbarPosition == AppSettings.Position.Top)
-            Rect(0, toolbarHeight, viewWidth, viewHeight)
-        else
-            Rect(0, 0, viewWidth, viewHeight - toolbarHeight)
+        AppSettings.Position.Bottom -> {
+            excludeRect = Rect(0, viewHeight - toolbarHeight, viewWidth, viewHeight)
+            limitRect = Rect(0, 0, viewWidth, viewHeight - toolbarHeight)
+        }
+
+        AppSettings.Position.Left, AppSettings.Position.Right -> {
+            // Empty, exactly as for a closed toolbar.
+            excludeRect = Rect(0, 0, viewWidth, 0)
+            limitRect = Rect(0, 0, viewWidth, viewHeight)
+        }
+    }
 
     touchHelper.setLimitRect(mutableListOf(limitRect)).setExcludeRect(listOf(excludeRect))
         .openRawDrawing()

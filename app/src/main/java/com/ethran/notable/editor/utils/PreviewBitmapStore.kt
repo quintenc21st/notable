@@ -108,9 +108,19 @@ fun deletePagePreviews(filesDir: File, pageID: String) {
 
 private fun isEqApprox(a: Float, b: Float): Boolean = abs(a - b) <= EQUALITY_THRESHOLD
 
-/** Whether a view at [viewport] makes the page's preview: unzoomed, at the page's left edge. */
+/**
+ * The zoom at which a page exactly fills the editor's width — the editor's resting zoom. Kept up
+ * to date by the editor's PageView, as it depends on the view's width (rotation, side toolbar).
+ */
+@Volatile
+var pageFitZoom: Float = 1f
+
+/**
+ * Whether a view at [viewport] makes the page's preview: fitted to the width, at the page's left
+ * edge.
+ */
 fun canSavePreview(viewport: PageViewport): Boolean =
-    isEqApprox(viewport.zoom, 1f) && isEqApprox(viewport.scroll.x, 0f)
+    isEqApprox(viewport.zoom, pageFitZoom) && isEqApprox(viewport.scroll.x, 0f)
 
 private fun isCacheFresh(file: File, pageUpdatedAtMs: Long?): Boolean {
     return pageUpdatedAtMs == null || pageUpdatedAtMs <= 0 || file.lastModified() >= pageUpdatedAtMs

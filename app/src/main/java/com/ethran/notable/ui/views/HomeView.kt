@@ -26,6 +26,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -60,6 +61,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -164,12 +166,17 @@ fun LibraryContent(
     onImportXopp: (Uri) -> Unit,
     onPreviewMissing: (String) -> Unit
 ) {
-    Row(
+    BoxWithConstraints(
         Modifier
             .fillMaxSize()
             .background(Color.White)
     ) {
+    // Held in portrait there is less width to share: a slimmer sidebar, and the header's
+    // buttons move under the title.
+    val compact = maxWidth < 1000.dp
+    Row(Modifier.fillMaxSize()) {
         LibrarySidebar(
+            width = if (compact) 200.dp else 250.dp,
             appRepository = appRepository,
             uiState = uiState,
             onNavigateToFolder = onNavigateToFolder,
@@ -188,6 +195,7 @@ fun LibraryContent(
                 .fillMaxHeight()
         ) {
             LibraryHeader(
+                compact = compact,
                 uiState = uiState,
                 onCreateNewQuickPage = onCreateNewQuickPage,
                 onCreateNewNotebook = onCreateNewNotebook,
@@ -207,6 +215,7 @@ fun LibraryContent(
             )
         }
     }
+    }
 }
 
 /**
@@ -216,6 +225,7 @@ fun LibraryContent(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LibrarySidebar(
+    width: Dp,
     appRepository: AppRepository,
     uiState: LibraryUiState,
     onNavigateToFolder: (String?) -> Unit,
@@ -225,7 +235,7 @@ private fun LibrarySidebar(
     val path = uiState.breadcrumbFolders
     Column(
         Modifier
-            .width(250.dp)
+            .width(width)
             .fillMaxHeight()
             .padding(horizontal = 14.dp, vertical = 18.dp)
     ) {
@@ -391,6 +401,7 @@ private fun SectionLabel(text: String, count: Int? = null, modifier: Modifier = 
 /** Title of the open folder, with the actions that create things in it. */
 @Composable
 private fun LibraryHeader(
+    compact: Boolean,
     uiState: LibraryUiState,
     onCreateNewQuickPage: () -> Unit,
     onCreateNewNotebook: () -> Unit,
@@ -398,38 +409,49 @@ private fun LibraryHeader(
     onImportXopp: (Uri) -> Unit,
 ) {
     val path = uiState.breadcrumbFolders
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(start = 28.dp, end = 24.dp, top = 20.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(Modifier.weight(1f)) {
+    val title = @Composable {
+        Text(
+            text = path.lastOrNull()?.title ?: stringResource(R.string.home_view_name),
+            fontSize = 30.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (path.size > 1) {
             Text(
-                text = path.lastOrNull()?.title ?: stringResource(R.string.home_view_name),
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black,
+                text = path.dropLast(1).joinToString("  ›  ") { it.title },
+                fontSize = 14.sp,
+                color = Color.DarkGray,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            if (path.size > 1) {
-                Text(
-                    text = path.dropLast(1).joinToString("  ›  ") { it.title },
-                    fontSize = 14.sp,
-                    color = Color.DarkGray,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
         }
-        Spacer(Modifier.width(16.dp))
+    }
+    val actions = @Composable {
         NotebookImportPanel(
             onCreateNewNotebook = onCreateNewNotebook,
             onCreateNewQuickPage = onCreateNewQuickPage,
             onImportPdf = onImportPdf,
             onImportXopp = onImportXopp
         )
+    }
+    val padding = Modifier
+        .fillMaxWidth()
+        .padding(start = 28.dp, end = 24.dp, top = 20.dp, bottom = 12.dp)
+
+    if (compact) {
+        Column(padding) {
+            title()
+            Spacer(Modifier.height(12.dp))
+            actions()
+        }
+    } else {
+        Row(padding, verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) { title() }
+            Spacer(Modifier.width(16.dp))
+            actions()
+        }
     }
 }
 

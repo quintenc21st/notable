@@ -58,18 +58,22 @@ fun ToolbarMenu(
     onAction: (ToolbarAction) -> Unit,
 ) {
     val density = LocalDensity.current
-
-    ScaledPopup(
-        alignment = Alignment.TopEnd,
-        onDismissRequest = {
-            onAction(ToolbarAction.ToggleMenu)
-        },
-        offset = with(density) {
+    // Beside the button on a side toolbar; under it, tucked in from the edge, otherwise.
+    val (alignment, offset) =
+        if (LocalToolbarPosition.current.isVertical) toolbarPopupPlacement()
+        else Alignment.TopEnd to with(density) {
             IntOffset(
                 (-10).dp.roundToPx(),
                 50.dp.roundToPx()
             )
+        }
+
+    ScaledPopup(
+        alignment = alignment,
+        onDismissRequest = {
+            onAction(ToolbarAction.ToggleMenu)
         },
+        offset = offset,
         properties = PopupProperties(focusable = true),
     ) {
         ToolbarMenuContent(

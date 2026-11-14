@@ -1,9 +1,12 @@
 package com.ethran.notable.editor
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -14,8 +17,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ethran.notable.data.datastore.AppSettings
+import com.ethran.notable.data.datastore.SIDE_TOOLBAR_WIDTH
 import com.ethran.notable.editor.canvas.CanvasEventBus
 import com.ethran.notable.editor.state.ClipboardStore
 import com.ethran.notable.editor.ui.EditorSurface
@@ -24,6 +30,7 @@ import com.ethran.notable.editor.ui.PagesPopup
 import com.ethran.notable.editor.ui.ScrollIndicator
 import com.ethran.notable.editor.ui.SelectedBitmap
 import com.ethran.notable.editor.ui.toolbar.PositionedToolbar
+import com.ethran.notable.editor.ui.toolbar.toolbarPositionForOrientation
 import com.ethran.notable.gestures.EditorGestureReceiver
 import com.ethran.notable.navigation.NavigationDestination
 import com.ethran.notable.ui.LocalSnackContext
@@ -35,6 +42,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
+import kotlin.math.abs
 
 private val log = ShipBook.getLogger("EditorView")
 
@@ -227,7 +235,8 @@ fun EditorView(
             zoomLevel, selectionActive
         ) {
             log.v("EditorView: zoomLevel=$zoomLevel, selectionActive=$selectionActive")
-            viewModel.setShowResetView(zoomLevel != 1.0f)
+            // "Reset view" is offered whenever the page is not at its resting, fit-to-width zoom.
+            viewModel.setShowResetView(abs(zoomLevel - page.fitZoom) > 0.005f)
             viewModel.setSelectionActive(selectionActive)
         }
 
@@ -240,26 +249,41 @@ fun EditorView(
 
 
         InkaTheme {
-            EditorGestureReceiver(actions = editorControlTower)
-            EditorSurface(
-                viewModel = viewModel,
-                page = page,
-                history = history
-            )
-            SelectedBitmap(
-                context = context, controlTower = editorControlTower
-            )
-            Row(
+            // A side toolbar gets a strip of its own and the page takes the rest, so the bar never
+            // covers the page's left or right edge. A top or bottom toolbar lies over the page.
+            val toolbarPosition = toolbarPositionForOrientation()
+            val sideStrip =
+                if (toolbarPosition.isVertical && toolbarState.isToolbarOpen) SIDE_TOOLBAR_WIDTH.dp
+                else 0.dp
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight()
+                    .fillMaxSize()
+                    .padding(
+                        start = if (toolbarPosition == AppSettings.Position.Left) sideStrip else 0.dp,
+                        end = if (toolbarPosition == AppSettings.Position.Right) sideStrip else 0.dp
+                    )
             ) {
-                Spacer(modifier = Modifier.weight(1f))
-                ScrollIndicator(viewModel = viewModel, page = page)
+                EditorGestureReceiver(actions = editorControlTower)
+                EditorSurface(
+                    viewModel = viewModel,
+                    page = page,
+                    history = history
+                )
+                SelectedBitmap(
+                    context = context, controlTower = editorControlTower
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                ) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    ScrollIndicator(viewModel = viewModel, page = page)
+                }
+                HorizontalScrollIndicator(viewModel = viewModel, page = page)
             }
             PositionedToolbar(
                 viewModel = viewModel, onDrawingStateCheck = { viewModel.updateDrawingState() })
-            HorizontalScrollIndicator(viewModel = viewModel, page = page)
 
             val popupBookId = toolbarState.notebookId
             if (toolbarState.isPagesPopupOpen && popupBookId != null) {

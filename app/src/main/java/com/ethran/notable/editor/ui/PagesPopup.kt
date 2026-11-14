@@ -50,7 +50,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ethran.notable.data.datastore.AppSettings
 import com.ethran.notable.data.datastore.BUTTON_SIZE
-import com.ethran.notable.data.datastore.GlobalAppSettings
+import com.ethran.notable.data.datastore.SIDE_TOOLBAR_WIDTH
+import com.ethran.notable.editor.ui.toolbar.toolbarPositionForOrientation
 import com.ethran.notable.editor.utils.autoEInkAnimationOnScroll
 import com.ethran.notable.ui.components.PagePreview
 import com.ethran.notable.ui.components.ScaledPopup
@@ -104,13 +105,21 @@ fun PagesPopup(
         if (state.bookMissing) onDismiss()
     }
 
-    val toolbarAtTop = GlobalAppSettings.current.toolbarPosition == AppSettings.Position.Top
+    // Just clear of the toolbar, wherever it is: under a top bar, over a bottom bar, and at the
+    // top of the page, nudged off the bar, beside a side bar.
     val density = LocalDensity.current
     val gap = with(density) { (BUTTON_SIZE + 10).dp.roundToPx() }
+    val edge = with(density) { 12.dp.roundToPx() }
+    val (alignment, offset) = when (toolbarPositionForOrientation()) {
+        AppSettings.Position.Top -> Alignment.TopCenter to IntOffset(0, gap)
+        AppSettings.Position.Bottom -> Alignment.BottomCenter to IntOffset(0, -gap)
+        AppSettings.Position.Left -> Alignment.TopCenter to IntOffset(gap / 2, edge)
+        AppSettings.Position.Right -> Alignment.TopCenter to IntOffset(-gap / 2, edge)
+    }
 
     ScaledPopup(
-        alignment = if (toolbarAtTop) Alignment.TopCenter else Alignment.BottomCenter,
-        offset = IntOffset(0, if (toolbarAtTop) gap else -gap),
+        alignment = alignment,
+        offset = offset,
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
@@ -199,7 +208,7 @@ private fun PagesPopupContent(
 
     Column(
         Modifier
-            .padding(horizontal = 24.dp)
+            .padding(horizontal = (SIDE_TOOLBAR_WIDTH + 12).dp)
             .widthIn(max = 1180.dp)
             .fillMaxWidth()
             .clip(PANEL_SHAPE)

@@ -2,6 +2,8 @@ package com.ethran.notable.data.datastore
 
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
+import com.ethran.notable.SCREEN_HEIGHT
+import com.ethran.notable.SCREEN_WIDTH
 import com.ethran.notable.editor.ui.toolbar.model.ToolbarLayout
 import com.ethran.notable.editor.ui.toolbar.model.ToolbarPen
 import com.ethran.notable.navigation.LinkFormat
@@ -12,6 +14,9 @@ import kotlinx.serialization.Serializable
 const val A4_WIDTH = 595
 const val A4_HEIGHT = 842
 const val BUTTON_SIZE = 37
+
+/** Width of the toolbar when it runs down a side edge, in dp: its buttons plus a hairline. */
+const val SIDE_TOOLBAR_WIDTH = BUTTON_SIZE + 3
 
 
 object GlobalAppSettings {
@@ -41,7 +46,11 @@ data class AppSettings(
     val defaultNativeTemplate: String = "blank",
     val quickNavPages: List<String> = listOf(),
     val scribbleToEraseEnabled: Boolean = false,
+    // Where the editor toolbar sits while the device is held in portrait. (The name predates
+    // the per-orientation setting and is kept for persisted-settings compatibility.)
     val toolbarPosition: Position = Position.Top,
+    // …and while it is held in landscape.
+    val toolbarPositionLandscape: Position = Position.Left,
     val smoothScroll: Boolean = true,
     val continuousZoom: Boolean = false,
     val continuousStrokeSlider: Boolean = false,
@@ -88,6 +97,19 @@ data class AppSettings(
     }
 
     enum class Position {
-        Top, Bottom, // Left,Right,
+        Top, Bottom, Left, Right;
+
+        /** A toolbar on a side edge runs top to bottom. */
+        val isVertical: Boolean get() = this == Left || this == Right
     }
+
+    fun toolbarPositionFor(isLandscape: Boolean): Position =
+        if (isLandscape) toolbarPositionLandscape else toolbarPosition
 }
+
+/**
+ * Where the editor toolbar sits right now, given how the device is held. For code outside
+ * composition; composables use `LocalToolbarPosition`, which also follows rotation.
+ */
+fun currentToolbarPosition(): AppSettings.Position =
+    GlobalAppSettings.current.toolbarPositionFor(SCREEN_WIDTH > SCREEN_HEIGHT)
